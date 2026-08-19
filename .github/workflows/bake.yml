@@ -1,0 +1,43 @@
+name: bake
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kline-bake
+  cancel-in-progress: false
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run bake
+        env:
+          GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}
+        run: node kline-snapshot.js
+
+      - name: Commit and push kline-snapshot.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- kline-snapshot.json; then
+            echo "no change in kline-snapshot.json, skipping commit"
+            exit 0
+          fi
+          git add kline-snapshot.json
+          git commit -m "cloud bake $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
