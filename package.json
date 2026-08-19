@@ -1,0 +1,12 @@
+{
+  "name": "gmgn-kline-snapshot-bake",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Cloud bake for kline-snapshot.json - runs kline-snapshot.js on a schedule via GitHub Actions and commits the result to this repo.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "bake": "node kline-snapshot.js"
+  }
+}
