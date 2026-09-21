@@ -25,7 +25,13 @@ jobs:
         with:
           node-version: '20'
 
+      # The bake stops early when GMGN rate-limits it, writes whatever it captured and
+      # exits non-zero. That used to skip the commit step below, so the published
+      # snapshot froze at 2026-09-17 through 29 consecutive runs. Let the step report
+      # failure without ending the job; the gate below decides if the output is usable.
       - name: Run bake
+        id: bake
+        continue-on-error: true
         env:
           GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}
         run: node kline-snapshot.js
@@ -34,6 +40,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('kline-snapshot.json','utf8'));if(!s||!s.generatedAt)throw new Error('snapshot missing generatedAt');const b=fs.statSync('kline-snapshot.json').size;if(b<10000)throw new Error('snapshot too small: '+b+' bytes');console.log('snapshot usable:',b,'bytes');"
           if git diff --quiet -- kline-snapshot.json; then
             echo "no change in kline-snapshot.json, skipping commit"
             exit 0
@@ -41,3 +48,7 @@ jobs:
           git add kline-snapshot.json
           git commit -m "cloud bake $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push
+
+      - name: Note a partial bake
+        if: steps.bake.outcome == 'failure'
+        run: echo "::warning::bake stopped early, most likely rate limited. A partial snapshot was published and the next run fills in the rest."
